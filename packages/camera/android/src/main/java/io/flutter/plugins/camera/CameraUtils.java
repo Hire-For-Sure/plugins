@@ -52,7 +52,6 @@ public final class CameraUtils {
       details.put("name", cameraName);
       int sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION);
       details.put("sensorOrientation", sensorOrientation);
-
       int lensFacing = characteristics.get(CameraCharacteristics.LENS_FACING);
       switch (lensFacing) {
         case CameraMetadata.LENS_FACING_FRONT:
@@ -68,6 +67,56 @@ public final class CameraUtils {
       cameras.add(details);
     }
     return cameras;
+  }
+
+  private static int getMaxHeightFromPreset(ResolutionPreset preset){
+    switch (preset){
+      case max:
+        return Integer.MAX_VALUE;
+      case ultraHigh:
+        return 2160;
+      case veryHigh:
+        return 1080;
+      case high:
+        return 720;
+      case medium:
+        return 480;
+      case low:
+      default:
+        return 240;
+    }
+  }
+
+  static Size getCaptureSize(StreamConfigurationMap streamConfigurationMap, String cameraName, ResolutionPreset preset){
+    Size[] sizes = streamConfigurationMap.getOutputSizes(ImageFormat.JPEG);
+    double aspectRatio = 16.0/9.0;
+    final double epsilon = 0.000001;
+    List<Size> filtered = new ArrayList<Size>();
+    for(Size s: sizes){
+      int w = s.getWidth();
+      int h = s.getHeight();
+      double asp = (w*1.0/h);
+      if(Math.abs(asp - aspectRatio) < epsilon){
+        filtered.add(s);
+      }
+    }
+    Collections.sort(filtered, new CompareSizesByArea());
+    Collections.reverse(filtered);
+    for (Size s: filtered){
+      System.out.println(cameraName+" "+s.toString());
+    }
+    if(filtered.isEmpty()){
+      CamcorderProfile profile = getBestAvailableCamcorderProfileForResolutionPreset(cameraName, preset);
+      return new Size(profile.videoFrameWidth, profile.videoFrameHeight);
+    }else{
+      int maxStartHeight = getMaxHeightFromPreset(preset);
+      for (Size s: filtered){
+        if(s.getHeight() < maxStartHeight)
+          return s;
+      }
+    }
+    throw new IllegalArgumentException(
+            "No capture session available for current capture session.");
   }
 
   static CamcorderProfile getBestAvailableCamcorderProfileForResolutionPreset(
